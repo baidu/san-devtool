@@ -23,12 +23,18 @@
                         <div class="payload">
                             <div class="payload-header">
                                 payload
-                                <san-button
-                                    type="primary"
-                                    on-click="dispatchHandler"
-                                >
-                                    dispatch
-                                </san-button>
+                                <div class="payload-header-actions">
+                                    <san-tooltip
+                                        title="dispatch action"
+                                    >
+                                        <san-icon class="payload-header-actions-item" type="dispatch" on-click="dispatchHandler" options="{{{fill: '#1968fa'}}}"></san-icon>
+                                    </san-tooltip>
+                                    <san-tooltip
+                                        title="time travel"
+                                    >
+                                        <san-icon class="payload-header-actions-item" type="travel" on-click="timeTravel" options="{{{fill: '#1968fa'}}}"></san-icon>
+                                    </san-tooltip>
+                                </div>
                             </div>
                             <san-json-tree-view
                                 s-ref="payload"
@@ -102,7 +108,49 @@
                     </div>
                 </san-collapse-panel>
                 <san-collapse-panel header="Diff" key='1' s-else>
-                    <div>may be your actions dispatched but not return "build().set(...)"</div>
+                    <div>this mutation is unnecessary, make some optimization</div>
+                </san-collapse-panel>
+            </san-collapse>
+        </div>
+        <div class="ex-panel-wrapper">
+            <san-collapse defaultActiveKey="{{['1']}}">
+                <san-collapse-panel header="Call Stack" key='1'>
+                    <template s-for="item, index in actionCallStack">
+                        <div class="call-stack-info">
+                            <span>{{item.name}}</span>
+                            <san-popover
+                                s-if="{{index !== actionCallStack.length - 1}}"
+                                placement="left"
+                                overlayClassName="san-devtools-store-popup-content"
+                            >
+                                <div
+                                    style="font-size: 20px;cursor: pointer;display: flex;"
+                                    slot="content"
+                                >
+                                    <san-tooltip title="dispatch action" class="san-devtools-store-popup-content-tooltip">
+                                        <san-icon
+                                            class="call-stack-info-action"
+                                            type="dispatch"
+                                            on-click="dispatchHandler(item.storeName, item.name, index)"
+                                            options="{{{fill: '#1968fa'}}}"
+                                        ></san-icon>
+                                    </san-tooltip>
+                                </div>
+                                <san-icon class="call-stack-info-menu" type="more" options="{{{fill: '#1968fa'}}}"></san-icon>
+                            </san-popover>
+                        </div>
+                        <san-json-tree-view
+                            class="call-stack-data"
+                            s-if="{{index !== actionCallStack.length - 1}}"
+                            s-ref="payload{{index}}"
+                            alwaysShowRoot="{{!0}}"
+                            data="{{item.payload}}"
+                            filterText="{{filterText}}"
+                            rootName="payload"
+                            readonly="{{readonly}}"
+                        >
+                        </san-json-tree-view>
+                    </template>
                 </san-collapse-panel>
             </san-collapse>
         </div>
@@ -112,13 +160,13 @@
 
 <script>
     import san, { DataTypes } from 'san';
-    import {STORE_DISPATCH} from '@shared/protocol';
+    import {STORE_DISPATCH, STORE_TIME_TRAVEL} from '@shared/protocol';
     import { connectStore, store } from '@frontend/store/index';
     import JSONView from 'json-tree-view';
     import 'json-tree-view/devtools.css';
 
     import pageheader from 'santd/es/pageheader';
-    import { Switch, Grid, Divider, Button, Collapse, Tooltip } from 'santd';
+    import { Switch, Grid, Divider, Button, Collapse, Tooltip, Popover } from 'santd';
 
     import JsonTreeView from '@frontend/components/misc/jsonTreeView.san';
     import Icon from '@frontend/components/icon/icon.san';
@@ -127,6 +175,7 @@
         selectedMutationInfo: 'selectedMutationInfo',
         storeName: 'selectedMutationInfo.storeName',
         diffData: 'selectedMutationInfo.diff',
+        actionCallStack: 'actionCallStack',
         bridge: 'bridge',
         readonly: 'settings.storeReadOnly'
     })(
@@ -165,11 +214,14 @@
                 }
             },
 
-            dispatchHandler() {
+            dispatchHandler(storeName, actionName, index) {
+                if (storeName instanceof MouseEvent) {
+                    storeName = this.data.get('storeName');
+                    actionName = this.data.get('selectedMutationInfo.actionName');
+                    index = '';
+                }
+                let payload = this.ref(`payload${index}`).viewer().value;
                 let bridge = this.data.get('bridge');
-                let storeName = this.data.get('storeName');
-                let actionName = this.data.get('selectedMutationInfo.actionName');
-                let payload = this.ref('payload').viewer().value;
                 let message = {
                     storeName,
                     actionName,
@@ -190,12 +242,23 @@
                 'san-collapse': Collapse,
                 'san-collapse-panel': Collapse.Panel,
                 'san-tooltip': Tooltip,
+                'san-popover': Popover
             },
 
             initData() {
                 return {
                     diffState: [true]
                 };
+            },
+
+            timeTravel() {
+                let storeName = this.data.get('storeName');
+                let selectedMutationInfo = this.data.get('selectedMutationInfo');
+                console.log('selectedMutationInfo', storeName, selectedMutationInfo.actionId);
+                this.data.get('bridge').send(STORE_TIME_TRAVEL, {
+                    id: selectedMutationInfo.actionId,
+                    storeName
+                });
             }
         }
     )
@@ -204,11 +267,27 @@
 
 <style lang="less">
     @import '@frontend/views/style/variables.less';
+    .san-devtools-store-popup-content {
+        &-tooltip > span {
+            display: flex;
+        }
+    }
     .mutation-wrap {
         .payload-wrapper {
             .payload {
                 margin: 3px 0;
                 .payload-header {
+                    user-select: none;
+                    &-actions {
+                        font-size: 26px;
+                        &-item {
+                            cursor: pointer;
+                            &:hover {
+                                background: #eeeeee;
+                                border-radius: 50%;
+                            }
+                        }
+                    }
                     .santd-btn {
                         margin: 4px 0;
                         height: 28px;
@@ -226,6 +305,22 @@
                     margin-bottom: 5px;
                 }
             }
+        }
+        .call-stack-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            &-action, &-menu {
+                cursor: pointer;
+            }
+            &-content {
+                height: 30px;
+                width: 30px;
+                font-size: 30px;
+            }
+        }
+        .call-stack-data {
+            overflow: auto;
         }
         .switch-wrapper {
             margin: 15px 0;

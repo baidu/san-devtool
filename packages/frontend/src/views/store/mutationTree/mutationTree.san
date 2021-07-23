@@ -23,6 +23,7 @@
     import san, { DataTypes } from 'san';
     import { connectStore, store } from '@frontend/store/index';
     import TreeView from '@frontend/components/treeView/treeView.san';
+    import {STORE_GET_PARENTACTION, STORE_GET_DATA} from '@shared/protocol';
     export default connectStore({
         mutationTreeData: 'mutationTreeData',
         bridge: 'bridge'
@@ -40,7 +41,8 @@
                 }
             },
             setSelectedMutationInfo(value) {
-                if (!value.id) {
+                const bridge = this.data.get('bridge');
+                if (!value.id || !bridge) {
                     return;
                 }
                 let info = {
@@ -55,6 +57,12 @@
                     diff: value.diff
                 }
                 store.dispatch('setSelectedMutationInfo', info);
+                const mutationInfo = {
+                    id: value.id,
+                    storeName: value.storeName
+                };
+                bridge.send(STORE_GET_PARENTACTION, mutationInfo);
+                bridge.send(STORE_GET_DATA, mutationInfo);
             },
             setSelectedStoreData(value) {
                 store.dispatch('setStoreDataOnClickMutation', value.storeName);

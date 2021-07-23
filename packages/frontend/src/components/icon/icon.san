@@ -5,7 +5,9 @@
         class="{{['Icon', className]}}"
         width="24"
         height="24"
-        viewBox="0 0 24 24">
+        viewBox="0 0 24 24"
+        on-click="clickHandle"
+    >
         <template s-for="item in pathData">
             <path fill="{{item.fill}}" transform="{{item.transform}}" d="{{item.d}}" />
         </template>
@@ -21,6 +23,10 @@
             options: DataTypes.object,
             /* state */
             className: DataTypes.string
+        },
+
+        clickHandle(e) {
+            this.fire('click', e)
         },
 
         initData() {

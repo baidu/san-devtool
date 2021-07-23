@@ -3,7 +3,7 @@
     "name": "backend",
     "version": "0.0.0",
     "dependencies": {
-        "shared":"^0.0.0"
+        "shared": "^0.0.0"
     },
     "repository": {
         "type": "git",

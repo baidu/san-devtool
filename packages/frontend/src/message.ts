@@ -11,6 +11,7 @@ import {
     COMPONENT_SET_INFO,
     STORE_SET_MUTATION_INFO,
     STORE_SET_DATA,
+    STORE_SET_PARENTACTION,
     HISTORY_SET_INFO,
     MESSAGE_SET_INFO,
     EVENT_SET_INFO,
@@ -37,6 +38,7 @@ export default class FrontendReceiver extends EventEmitter {
         bridge.on(STORE_SET_MUTATION_INFO, this.onMutation.bind(this));
         bridge.on(STORE_SET_DATA, this.onStore.bind(this));
         bridge.on(STORE_DATA_CHANGED, this.onStoreChanged.bind(this));
+        bridge.on(STORE_SET_PARENTACTION, this.onActionCallStack.bind(this));
         bridge.on(HISTORY_SET_INFO, this.onHistory.bind(this));
         bridge.on(MESSAGE_SET_INFO, this.onMessage.bind(this));
         bridge.on(EVENT_SET_INFO, this.onEvent.bind(this));
@@ -79,6 +81,9 @@ export default class FrontendReceiver extends EventEmitter {
     }
     onStoreChanged() {
         store.dispatch('setStoreChanged', true);
+    }
+    onActionCallStack(data: any) {
+        store.dispatch('setActionCallStack', JSON.parse(data));
     }
     onHistory(data: any) {
         // history 数据的接收是一个频繁触发的动作，store 的修改是同步的，会阻塞用户的交互动作

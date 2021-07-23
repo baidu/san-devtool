@@ -6,6 +6,7 @@ import {builder} from 'san-update';
 export const setCount = {
     initData: {
         globalCount: '',
+        extraData: 0,
         sonCount: '',
         testObj: {
             a: 1,
@@ -37,6 +38,9 @@ export const setCount = {
                 .set('globalCount', count)
                 .set('sonCount', count + 10)
                 .set('testObj.b.c', {count: count + 100});
+        },
+        extraData(count) {
+            return builder().set('extraData', count);
         }
     }
 };

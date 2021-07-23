@@ -7,16 +7,21 @@ import {
     getMutationData,
     dispatchAction,
     setStoreComponentData,
-    getStoreData
+    getStoreData,
+    getAsyncActionData
 } from './storeTree';
+import {travelTo, collectMapStatePath} from './timeTravel';
 import CircularJSON from '@shared/utils/circularJSON';
 import {
     STORE_SET_MUTATION_INFO,
     STORE_SET_DATA, STORE_GET_DATA,
     STORE_DATA_CHANGED,
-    STORE_DISPATCH
+    STORE_DISPATCH,
+    STORE_TIME_TRAVEL,
+    STORE_GET_PARENTACTION,
+    STORE_SET_PARENTACTION
 } from '@shared/protocol';
-import {storeDecorator} from './versionControl';
+import {storeDecorator} from './storeDecorator';
 
 
 export class StoreAgent extends Agent {
@@ -35,23 +40,21 @@ export class StoreAgent extends Agent {
              */
             case 'store-default-inited': {
                 let {store} = data;
-                // 装饰store
                 storeDecorator.handler(store);
                 if (store.name !== '__default__') {
                     console.warn('[SAN_DEVTOOLS]: there is must be something bad has happened in san-store');
                     return;
                 }
-                setStore(this.hook, store, true);
+                setStore(this.hook, store);
                 break;
             }
             /**
              * connectStore(store) 调用：与 store 创建链接
              */
             case 'store-connected': {
-                // 存储 store 实例
-                // mapStates, mapActions 在这没啥用
                 let {store} = data;
-                setStore(this.hook, store, true);
+                storeDecorator.timeTravel(store);
+                setStore(this.hook, store);
                 break;
             }
             /**
@@ -62,38 +65,38 @@ export class StoreAgent extends Agent {
              * 3. 组件生命周期初始化触发: inited
              */
             case 'store-listened': {
-                // 选择静默，否则更新 store 实例，因为后续立马会执行 store-comp-inited
+                // 后续立马会执行 store-comp-inited
                 break;
             }
             case 'store-comp-inited': {
-                // actions 函数不需要更新
-                // 展示到组件上
                 let {
                     mapStates,
                     mapActions,
                     store,
                     component,
                 } = data;
-                let storeData = setStore(this.hook, store, false, {componentId: component.id, type: 'add'});
+                let storeName = setStore(this.hook, store);
                 this.sendToFrontend(STORE_DATA_CHANGED, '');
-                // 更新 component 信息
-                setStoreComponentData(this.hook, component, false, mapStates, mapActions, storeData.storeName);
+                setStoreComponentData(this.hook, component, false, mapStates, mapActions, storeName);
+                collectMapStatePath(this.hook, storeName, mapStates);
                 break;
             }
             /**
              * 调用 store.dispatch 触发 store 的值的改变
              * 需要记录下来，作为 store tree 的展示内容，但是当变动频繁的时候
              */
-            case 'store-dispatch':
-            case 'store-dispatched': {
-                // actions 函数不需要更新
-                // 构建一个 storetree
+            case 'store-dispatch': {
                 let {store} = data;
-                // 更新 store
-                let storeData = setStore(this.hook, store, false);
-                // 发送 mutation 数据
-                let mutation = getMutationData(data, storeData.storeName);
-                this.sendToFrontend(STORE_SET_MUTATION_INFO, CircularJSON.stringify(mutation));
+                setStore(this.hook, store);
+                break;
+            }
+            case 'store-dispatched': {
+                let {store} = data;
+                let storeName = setStore(this.hook, store);
+                let mutation = getMutationData(data, storeName);
+                if (mutation !== null) {
+                    this.sendToFrontend(STORE_SET_MUTATION_INFO, CircularJSON.stringify(mutation));
+                }
                 break;
             }
             /**
@@ -104,29 +107,17 @@ export class StoreAgent extends Agent {
              * 3. 组件生命周期初始化触发: disposed
              */
             case 'store-unlistened': {
-                // 选择静默，否则更新 store 实例，因为后续立马会执行 store-comp-disposed
+                // 后续立马会执行 store-comp-disposed
                 break;
             }
             case 'store-comp-disposed': {
-                // 需要更新 store 实例
                 let {
                     store,
                     component
                 } = data;
-                setStore(this.hook, store, false, {componentId: component.id, type: 'delete'});
+                setStore(this.hook, store);
                 this.sendToFrontend(STORE_DATA_CHANGED, '');
                 setStoreComponentData(this.hook, component, true);
-                break;
-            }
-            /**
-             * 调用 store.addAction 触发 store 的值的改变
-             */
-            case 'store-action-added': {
-                // 更新 actions 函数
-                // 需要更新 store 实例
-                let {store} = data;
-                setStore(this.hook, store, true);
-                this.sendToFrontend(STORE_DATA_CHANGED, '');
                 break;
             }
             default: break;
@@ -137,8 +128,27 @@ export class StoreAgent extends Agent {
             dispatchAction(this.hook, message);
         });
         this.bridge.on(STORE_GET_DATA, message => {
-            let storeData = getStoreData(this.hook, message);
+            const {id, storeName} = message || {};
+            if (!id || !storeName) {
+                return;
+            }
+            let storeData = getStoreData(this.hook, storeName, id);
             this.sendToFrontend(STORE_SET_DATA, CircularJSON.stringify(storeData));
+        });
+        this.bridge.on(STORE_TIME_TRAVEL, message => {
+            if (message && message.id && message.storeName) {
+                const {id, storeName} = message;
+                const store = this.hook.storeMap.get(storeName);
+                travelTo(store, id);
+            }
+        });
+        this.bridge.on(STORE_GET_PARENTACTION, message => {
+            if (message && message.id && message.storeName) {
+                const {id, storeName} = message;
+                const store = this.hook.storeMap.get(storeName);
+                const actions = getAsyncActionData(id, store.store, storeName);
+                this.sendToFrontend(STORE_SET_PARENTACTION, CircularJSON.stringify(actions));
+            }
         });
     }
 }

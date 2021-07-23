@@ -12,6 +12,7 @@
  *    var d = new Date();
  *  dateFormat(d," yyyy年M月d日\n yyyy-MM-dd\n MM-dd-yy\n yyyy-MM-dd hh:mm:ss")
  *  //2018年11月10日\n 2018-01-01\n 01-01-18\n 2018-11-12 12:01:02
+ * @todo 参数按照变化程度从左到右排列，利于柯里化
  */
 export function toLocaleDatetime(d: Date, pattern = 'yyyy-MM-dd') {
     if (!(d instanceof Date)) {

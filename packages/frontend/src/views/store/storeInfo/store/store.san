@@ -1,17 +1,8 @@
 <template>
     <div class="ex-panel-panel">
-        <div class="ex-panel-wrapper store-button">
-            <san-button
-                s-if="storeChanged"
-                type="primary"
-                on-click="refreshStoreData"
-            >
-                get new store data
-            </san-button>
-        </div>
         <div class="ex-panel-wrapper" s-if="!!raw">
             <san-collapse defaultActiveKey="{{['1']}}">
-                <san-collapse-panel header="Current store state" key='1'>
+                <san-collapse-panel header="Store state" key='1'>
                     <san-json-tree-view
                         selectedComponentId="{{selectedComponentId}}"
                         alwaysShowRoot="{{!0}}"
@@ -57,7 +48,7 @@
 
 <script>
     import san, { DataTypes } from 'san';
-    import {STORE_GET_DATA, INSPECT_HIGHLIGHT, INSPECT_UNHIGHLIGHT} from '@shared//protocol';
+    import {INSPECT_HIGHLIGHT, INSPECT_UNHIGHLIGHT} from '@shared/protocol';
     import { connectStore, store } from '@frontend/store/index';
     import JSONView from 'json-tree-view';
     import 'json-tree-view/devtools.css';
@@ -72,9 +63,7 @@
         actions: 'storeData.actions',
         components: 'storeData.components',
         storeName: 'selectedMutationInfo.storeName',
-        bridge: 'bridge',
-        storeChanged: 'storeChanged',
-        activeTab: 'activeTab',
+        bridge: 'bridge'
     })(
         {
             dataTypes: {
@@ -83,13 +72,7 @@
                 components: DataTypes.object,
                 storeName: DataTypes.string,
                 bridge: DataTypes.object,
-                storeChanged: DataTypes.bool,
-                activeTab: DataTypes.string,
                 filterText: DataTypes.string
-            },
-
-            refreshStoreData() {
-                this.data.get('bridge') && this.data.get('bridge').send(STORE_GET_DATA, this.data.get('storeName'));
             },
 
             highlightNativeNode(componentId) {
@@ -119,27 +102,6 @@
                 'san-collapse-panel': Collapse.Panel,
                 'san-pretty-code': PrettyCode,
                 'san-button': Button
-            },
-
-            created() {
-                let messageOpen = false;
-                this.watch('storeChanged', storeChanged => {
-                    if (storeChanged && this.data.get('activeTab') === 'store' && !messageOpen) {
-                        messageOpen = true;
-                        Message.info(
-                            'store has changed',
-                            0.5,
-                            () => {
-                                messageOpen = false;
-                            }
-                        );
-                    }
-                });
-                this.watch('activeTab', activeTab => {
-                    if (activeTab !== 'store') {
-                        Message.destroy()
-                    }
-                })
             }
         }
     )

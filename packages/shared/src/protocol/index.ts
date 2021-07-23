@@ -26,6 +26,9 @@ const STORE_SET_DATA = 'Store.setStoreData'; // 接收 store
 const STORE_GET_DATA = 'Store.getStoreData'; // 接收 store
 const STORE_DATA_CHANGED = 'Store.storeChanged'; // store 变化了
 const STORE_DISPATCH = 'Store.dispatchAction';
+const STORE_TIME_TRAVEL = 'Store.timeTravel';
+const STORE_GET_PARENTACTION = 'Store.getParentAction';
+const STORE_SET_PARENTACTION = 'store.setParentAction';
 
 // history
 const HISTORY_SET_INFO = 'History.setHistory'; // 接收
@@ -80,6 +83,9 @@ export {
     STORE_GET_DATA,
     STORE_DATA_CHANGED,
     STORE_DISPATCH,
+    STORE_TIME_TRAVEL,
+    STORE_GET_PARENTACTION,
+    STORE_SET_PARENTACTION,
 
     HISTORY_SET_INFO,
     HISTORY_GET_INFO,

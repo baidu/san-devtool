@@ -14,10 +14,20 @@ interface StoreData {
     components?: Record<string, any>;
 }
 
+interface IActionData {
+    id: number; // action id
+    name: string; // action 名字
+    parentId: number; // 父 action id
+    payload: any; // 接收的值
+    timeRange: string;
+    storeName: string;
+}
+
 export const setStoreData = {
     initData: {
         storeData: null,
-        storeChanged: true
+        storeChanged: true,
+        actionCallStack: []
     },
     actions: {
         setStoreData(storeData: StoreData, {getState, dispatch}: any) {
@@ -36,6 +46,9 @@ export const setStoreData = {
         },
         setStoreChanged(storeChanged: boolean) {
             return builder().set('storeChanged', storeChanged);
+        },
+        setActionCallStack(callList: IActionData[]) {
+            return builder().set('actionCallStack', callList);
         }
     }
 };

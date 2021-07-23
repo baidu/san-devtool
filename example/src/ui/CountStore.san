@@ -1,6 +1,6 @@
 <template>
     <div>
-        从 store 中获取到的数据： {{ testObj.b.c.count }}
+        从 store 中获取到的数据： {{ count2.b.c.count }} - {{count1}} - {{count3}}
     </div>
 </template>
 
@@ -9,7 +9,8 @@ import {connectStore} from '@src/store/index';
 export default connectStore({
     count: 'globalCount',
     count1: 'sonCount',
-    count2: 'testObj'
+    count2: 'testObj',
+    count3: 'extraData'
 })(
     {
         updated() {

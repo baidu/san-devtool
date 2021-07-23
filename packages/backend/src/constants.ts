@@ -29,7 +29,7 @@ export const SAN_STORE_HOOK = [
     'store-listened', // 监听 store
     'store-unlistened', // 取消监听 store
     'store-dispatched', // 触发 dispatch
-    'store-action-added', // 添加 action
+    'store-action-added', // 调用 store.addAction 添加 action
     'store-dispatch'
 ];
 

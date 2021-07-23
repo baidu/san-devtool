@@ -2,6 +2,7 @@
     <div>
         <span>count: {{ count }} /</span>
         <span>countComputed: 是 10 倍 count: {{ countComputed }}</span>
+        <button class="extra" on-click="extra">额外的数据<i class="fa fa-plus-square" /></button>
         <button class="increment" on-click="increment">添加 item<i class="fa fa-plus-square" /></button>
         <div s-for="item, index in todoList">
             {{ item }}
@@ -43,8 +44,12 @@ export default {
         let count = this.data.get('count') + 10;
         this.data.set('count', count);
         this.data.push('todoList', count);
-        store.dispatch('setCount', count);
+        // store.dispatch('setCount', count);
+        store.dispatch('setCountSon', count);
         this.fire('counter', 'event fire');
+    },
+    extra () {
+        store.dispatch('extraData', Math.random() * 1000);
     },
     decrement (index) {
         this.data.removeAt('todoList', index);

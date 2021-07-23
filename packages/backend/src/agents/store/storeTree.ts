@@ -1,45 +1,12 @@
 import {DevToolsHook, Component} from '../../hook';
+import {IMutationData, IActionData, IDispatchMsg} from './types';
+import {toLocaleDatetime} from '@shared/utils/dateFormator';
 
 let guidIndex = 0;
-interface StoreData {
-    storeName: string;
-    raw: any;
-    actions: any[];
-    components?: Record<string, any>;
-}
 
-interface ActionControl {
-    list: any[];
-    len: number;
-    index: any;
-    store: any; // store 实例
-}
-
-interface MutationData {
-    storeName: string;
-    extras: Array<{text: string}>;
-    timeRange: string;
-    status: string;
-    childs: any[];
-    displayName: string;
-    payload: any;
-    id: string;
-    parentId: string;
-    diff: Record<string, any>;
-    changedTarget: string;
-}
-
-interface ActionData {
-    id: number; // action id
-    name: string; // action 名字
-    parentId: number; // 父 action id
-    status: string; // 状态
-    actions: ActionData[]; // 子 action 列表
-}
-interface ComponentOption {
-    componentId: string;
-    type: 'delete' | 'add';
-}
+/* -------------------------------------------------------------------------- */
+/*                            get or set store data                           */
+/* -------------------------------------------------------------------------- */
 
 /**
  * 获取 store 对应的名字
@@ -63,30 +30,30 @@ function getStoreName(storeMap: Map<string, any>, store: any) {
 }
 
 /**
- * 获取 actions 数据，名称 + 函数字符串
- * @param actions actions 函数
+ * 更新 componentId，store 实例，存储 storeData
+ * @param hook
+ * @param store store 实例
+ * @param canGetAction 是否更新 storeData 中的 action，避免不必要的计算
+ * @param componentOption 如何处理 componentId
  */
-export function getActionsStr(actions: {[name: string]: Function}) {
-    return Object.entries(actions).map(([name, fn]: [string, Function]) => {
-        return {
-            name,
-            fn: fn && fn.toString()
-        };
-    });
-}
-
-/**
- * 获取 storeData
- * @param store
- * @param storeName
- * @param canGetAction 是否处理 actions
- */
-export function genStoreData(store: any, storeName: string, canGetAction: boolean): StoreData {
-    return {
-        storeName,
-        raw: store.raw,
-        actions: canGetAction ? getActionsStr(store.actions) : []
-    };
+export function setStore(
+    hook: DevToolsHook<{}>,
+    store: any
+) {
+    let {storeMap} = hook;
+    let fakeName = getStoreName(storeMap, store);
+    let oldData = hook.storeMap.get(fakeName);
+    if (!oldData) {
+        // 构建 data
+        hook.storeMap.set(fakeName, {
+            store,
+            components: {}
+        });
+    }
+    else {
+        oldData.store = store;
+    }
+    return fakeName;
 }
 
 /**
@@ -94,86 +61,27 @@ export function genStoreData(store: any, storeName: string, canGetAction: boolea
  * @param hook
  * @param storeName
  */
-export function getStoreData(hook: DevToolsHook<{}>, storeName: string) {
-    let store = hook.storeMap.get(storeName);
-    if (store && store.storeData) {
-        return store.storeData;
+export function getStoreData(hook: DevToolsHook<{}>, storeName: string, actionId: string) {
+    let {store} = hook.storeMap.get(storeName) || {};
+    if (!store || !store.stateChangeLogs) {
+        return;
     }
-    return null;
+    let state = null;
+    if (actionId) {
+        state = store.stateChangeLogs.find((item: any) => actionId === item.id);
+    }
+    else {
+        state = store.raw;
+    }
+    return state ? {
+        storeName,
+        raw: state.newValue
+    } : null;
 }
 
-/**
- * 当 connected 的组件挂载或者卸载的时候，从 store 相关的 components 中删除或者添加一个 conponentId
- * @param data
- * @param componentOption
- */
-function handleComponent(data: any, componentOption: ComponentOption) {
-    let {type, componentId} = componentOption;
-    if (!data || !data.components || !componentOption) {
-        return null;
-    }
-    switch (type) {
-        case 'delete': {
-            delete data.components[componentId];
-            break;
-        }
-        case 'add': {
-            data.components[componentId] = componentId;
-            break;
-        }
-        default:
-            break;
-    }
-    return data;
-}
-
-/**
- * 更新 componentId，store 实例，存储 storeData
- * @param hook
- * @param store store 实例
- * @param canGetAction 是否更新 storeData 中的 action，避免不必要的计算
- * @param componentOption 如何处理 componentId
- */
-export function setStore(hook: DevToolsHook<{}>, store: any, canGetAction: boolean, componentOption?: ComponentOption) {
-    let {storeMap} = hook;
-    let fakeName = getStoreName(storeMap, store);
-    let oldData = hook.storeMap.get(fakeName);
-    let newStoreData: StoreData;
-    if (!oldData) {
-        newStoreData = genStoreData(store, fakeName, true);
-        // 构建 data
-        newStoreData.components = {};
-        hook.storeMap.set(fakeName, {
-            store,
-            storeData: newStoreData
-        });
-    } else {
-        let handleAction = !oldData.storeData || !oldData.storeData.actions || oldData.storeData.actions.length === 0 ? true : canGetAction; // eslint-disable-line
-        newStoreData = genStoreData(store, fakeName, handleAction);
-        !handleAction && oldData.storeData && (newStoreData.actions = oldData.storeData.actions);
-        // 更新 data
-        newStoreData.components = oldData.storeData.components;
-        componentOption && (newStoreData = handleComponent(newStoreData, componentOption));
-        hook.storeMap.set(fakeName, {
-            store,
-            storeData: newStoreData
-        });
-    }
-    return newStoreData;
-}
-
-/**
- * 格式化时间
- * @param time 毫秒数
- */
-function formateTime(time: number) {
-    if (!time || time < 0) {
-        return '...';
-    }
-    let date = new Date(time);
-    return [date.getMinutes(), date.getSeconds(), date.getMilliseconds()].join(':');
-}
-
+/* -------------------------------------------------------------------------- */
+/*                         handle action and mutation                         */
+/* -------------------------------------------------------------------------- */
 /**
  * 获取 action 的『开始时间-结束时间』字符串
  * @param startTime 开始时间
@@ -183,13 +91,10 @@ function getTimeRange(startTime: number | undefined, endTime: number | undefined
     let start = '';
     let end = '';
     if (startTime) {
-        start = formateTime(startTime);
+        start = toLocaleDatetime(new Date(startTime), 'hhh:mm:ss');
     }
     if (endTime) {
-        end = formateTime(endTime);
-    }
-    if (!start && !end) {
-        return '';
+        end = toLocaleDatetime(new Date(endTime), 'hhh:mm:ss');
     }
     return `${start}-${end}`;
 }
@@ -235,11 +140,12 @@ function getChangedTarget(diffData: any[]) {
 }
 
 /**
- * 获取触发的 action 的基本信息
+ * 获取触发的 action 的基本信息，diff 不是 undefined 表示这是一个 mutation
+ * san-store v2.0.3 之前只有 dispatched 事件
  * @param data
  * @param storeName store 名称
  */
-export function getMutationData(data: any = {}, storeName: string): MutationData | null {
+export function getMutationData(data: any = {}, storeName: string): IMutationData | null {
     let actionInfo = getActionInfo(data);
     if (!actionInfo) {
         return null;
@@ -265,15 +171,20 @@ export function getMutationData(data: any = {}, storeName: string): MutationData
 
     let timeRange = getTimeRange(startTime, endTime);
     let status = !!done ? 'done' : 'pendding';
+    let mutationUseless = 'useless';
+    // 同步的 action，触发了 mutaion，但是数据没有变化
+    if (Array.isArray(diffData) && diffData.length > 0) {
+        mutationUseless = '';
+    }
     // mutation backend 不需要存储，在点开 mutation 详情面板并修改数据的时候直接找到 store name 以及相关数据直接操作 store
-    return {
+    return diffData === null ? null : {
         storeName: storeName,
         extras: [
+            // {
+            //     text: timeRange // 持续时间
+            // },
             {
-                text: timeRange // 持续时间
-            },
-            {
-                text: status // 展示状态用
+                text: mutationUseless // 展示状态用
             }
         ],
         timeRange,
@@ -288,10 +199,44 @@ export function getMutationData(data: any = {}, storeName: string): MutationData
     };
 }
 
-interface IDispatchMsg {
-    storeName: string;
-    actionName: string;
-    payload: any;
+/**
+ * 收集 action
+ * san-store v2.0.3 之前只有 dispatched 事件
+ * @param data
+ * @param storeName store 名称
+ */
+export function getAsyncActionData(id: string, store: any, storeName: string): IActionData[] {
+    const actionId = id;
+    const actions: IActionData[] = [];
+    if (!actionId || !store) {
+        return actions;
+    }
+    let curId = actionId;
+    while (curId) {
+        let actionInfo = getActionInfo({actionId: curId, store});
+        if (!actionInfo) {
+            break;
+        }
+        let {
+            id = '-1',
+            name = '',
+            parentId = undefined,
+            startTime = -1,
+            payload = '',
+            endTime = -1
+        } = actionInfo;
+        let timeRange = getTimeRange(startTime, endTime);
+        actions.unshift({
+            storeName: storeName,
+            timeRange,
+            name,
+            payload,
+            id,
+            parentId
+        });
+        curId = parentId;
+    }
+    return actions;
 }
 
 /**
@@ -307,6 +252,10 @@ export function dispatchAction(hook: DevToolsHook<{}>, message: IDispatchMsg) {
     let store = hook.storeMap.get(storeName).store;
     store.dispatch(actionName, payload);
 }
+
+/* -------------------------------------------------------------------------- */
+/*                    handle connected components info data                   */
+/* -------------------------------------------------------------------------- */
 
 function getStrFromObject(mapData: Record<string, any>) {
     if (Object.prototype.toString.call(mapData) === '[object Object]') {
